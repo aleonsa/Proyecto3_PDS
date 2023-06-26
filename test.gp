@@ -11,7 +11,7 @@ set title "Voice"
 #unset label
 set xlabel   "w"
 set ylabel   "magnitud"
-plot  "filtro.dat"
+plot  "vf.dat"
 unset xlabel
 unset ylabel
 unset title

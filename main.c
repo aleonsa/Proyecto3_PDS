@@ -6,6 +6,19 @@
 #define M           40000
 #define PI          3.1415926536
 #define SNR         1
+#define Fs          8000
+#define N           298
+
+void convolucion(float *x, int len_x, float *h, int len_h, float *y) {
+    for (int n = 0; n < len_x + len_h - 1; n++) {
+        y[n] = 0;
+        for (int k = 0; k < len_h; k++) {
+            if (n - k >= 0 && n - k < len_x) {
+                y[n] += x[n - k] * h[k];
+            }
+        }
+    }
+}
 
 void Goertzel(float *x, int len_x, double *y, int klim){
 	double vk0,vk1,vk2,AI, AR;
@@ -37,9 +50,39 @@ double signalPower(double* signal, int length) {
     return power;
 }
 
+void firFSPW(float* hFSBW, int fl, int fh){
+
+    float wl = (2 * PI * fl) / Fs;
+    float wh = (2 * PI * fh) / Fs;
+
+    float hFPB[N], hann[N];
+    float w0 = 2 * PI * (fh-fl) / Fs;
+    float wc = (wh - wl) / 2;
+
+    hFPB[0] = (1 / PI * 0.00001) * (sin(wc * 0.00001));
+    hFSBW[0] = 2 * hFPB[0];
+
+    for (int n = 1; n < N; n++) {
+        hFPB[n] = sin(wc * n) / (PI * n);
+        hFSBW[n] = 2 * cos(n * w0) * hFPB[n]; // NO CAUSAL
+    }
+
+    // Generamos ventana de Hanning
+    for (int i = 0; i < N; i++) {
+        hann[i] = 0.5 * (1 - cos(2 * PI * i / N));
+    }
+
+    // Multiplicamos hFSBW por la ventana y guardamos los resultados en el archivo filtro.dat
+    for (int i = 0; i < N; i++) {
+        hFSBW[i] = hann[i] * hFSBW[i];
+    }
+    
+}
+
 int main()
 {   
-    float v[M], vt[M], T1[M], T2[M];
+    float v[M], vt[M], vf[M];
+    float T1[M], T2[M];
     int n = 0;
     /* *********************Define File Pointers for plotting in GNUPlot*****************/
     FILE *fv, *fvt, *fvf, *fv_spec, *fvt_spec, *fvf_spec;
@@ -55,6 +98,41 @@ int main()
             return 1;
         }
 
+    /*************************Filtro FIR 300Hz*************************/
+    float hF1[N],hF2[N], hFT[N];
+    firFSPW(hF1, 290, 310);
+    firFSPW(hF2, 1190, 1210);
+
+    convolucion(hF1,N,hF2,N,hFT);
+
+
+    // int fl = 290;
+    // int fh = 310;
+    // float wl = (2 * PI * fl) / Fs;
+    // float wh = (2 * PI * fh) / Fs;
+
+    // float hFSBW[N], hFPB[N], hann[N];
+    // float w0 = 2 * PI * 300 / Fs;
+    // float wc = (wh - wl) / 2;
+
+    // hFPB[0] = (1 / PI * 0.00001) * (sin(wc * 0.00001));
+    // hFSBW[0] = 2 * hFPB[0];
+
+    // for (int n = 1; n < N; n++) {
+    //     hFPB[n] = sin(wc * n) / (PI * n);
+    //     hFSBW[n] = 2 * cos(n * w0) * hFPB[n]; // NO CAUSAL
+    // }
+
+    // // Generamos ventana de Hanning
+    // for (int i = 0; i < N; i++) {
+    //     hann[i] = 0.5 * (1 - cos(2 * PI * i / N));
+    // }
+
+    // // Multiplicamos hFSBW por la ventana y guardamos los resultados en el archivo filtro.dat
+    // for (int i = 0; i < N; i++) {
+    //     hFSBW[i] = hann[i] * hFSBW[i];
+    // }
+   
     /*************************************************************************************/
     // Read the voice file recorded with Matlab
         while (fscanf(fv, "%f", &v[n]) == 1){
@@ -100,6 +178,13 @@ int main()
         fprintf(fvt, "%f\n", vt[n]);
     }
 
+
+    convolucion(hFT, N, v, M, vf);
+    for (int i = 0; i < M; i++) {
+        fprintf(fvf, "%f\n", 100*vf[i]);
+    }
+
+
     /***************************************************************************************/
     // Close the file pointers
     fclose(fv);
@@ -109,7 +194,7 @@ int main()
     fclose(fvt_spec);
     fclose(fvf_spec);
 
-    //system("gnuplot -p main.gp");
+    system("gnuplot -p main.gp");
 
     return 0;
 }
