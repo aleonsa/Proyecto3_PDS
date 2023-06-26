@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <math.h>
 
-
 #define M           40000
 #define PI          3.1415926536
 #define SNR         1
@@ -101,9 +100,6 @@ int main()
         fprintf(fvt, "%f\n", vt[n]);
     }
 
-    
-
-
     /***************************************************************************************/
     // Close the file pointers
     fclose(fv);
@@ -113,7 +109,7 @@ int main()
     fclose(fvt_spec);
     fclose(fvf_spec);
 
-    system("gnuplot -p main.gp");
+    //system("gnuplot -p main.gp");
 
     return 0;
 }
