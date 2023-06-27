@@ -1,78 +1,78 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <math.h>
+#include <complex.h>
 
-#define PI          3.1415926536
-#define Fs          8000
-#define N           298
+#define PI 3.14159265358979323846
 
+typedef struct {
+    double a[3];
+    double b[3];
+} IIRCoefficients;
 
-void Goertzel(float *x, int len_x, double *y, int klim) {
-    double vk0, vk1, vk2, AI, AR;
-    int k, n;
-    for (k = 0; k < klim; k++) {
-        vk0 = 0;
-        vk1 = 0;
-        vk2 = 0;
-        for (n = 0; n < len_x; n++) {
-            vk0 = x[n] + 2 * cos(2 * PI * k / len_x) * vk1 - vk2;
-            vk2 = vk1;
-            vk1 = vk0;
-        }
-        AR = vk0 + vk1 * cos(2 * PI * k / len_x);
-        AI = vk1 * sin(2 * PI * k / len_x);
-        y[k] = sqrt(AR * AR + AI * AI);
-    }
+void calculateNotchCoefficients(double Fs, double F0, double Q, IIRCoefficients* coeffs) {
+    double w0 = 2.0 * PI * F0 / Fs;
+    double alpha = sin(w0) / (2.0 * Q);
+    double cosw0 = cos(w0);
+
+    coeffs->b[0] = 1.0;
+    coeffs->b[1] = -2.0 * cosw0;
+    coeffs->b[2] = 1.0;
+
+    coeffs->a[0] = 1.0 + alpha;
+    coeffs->a[1] = -2.0 * cosw0;
+    coeffs->a[2] = 1.0 - alpha;
 }
 
 int main() {
-    FILE *file, *especFile;
-        file = fopen("filtro.dat", "w");
-        especFile = fopen("espec.dat", "w");
+    // Parámetros del filtro 1 (300 Hz)
+    double Fs = 8000.0;  // Frecuencia de muestreo en Hz
+    double F0_1 = 300.0; // Frecuencia a suprimir en Hz
+    double Q_1 = 10;   // Factor de calidad del filtro
 
-    int fl = 290;
-    int fh = 310;
-    float wl = (2 * PI * fl) / Fs;
-    float wh = (2 * PI * fh) / Fs;
+    // Coeficientes del filtro 1
+    IIRCoefficients coeffs_1;
+    calculateNotchCoefficients(Fs, F0_1, Q_1, &coeffs_1);
 
-    float hFSBW[N], hFPB[N], hann[N];
-    float w0 = 2 * PI * 300 / Fs;
-    float wc = (wh - wl) / 2;
+    // Parámetros del filtro 2 (1200 Hz)
+    double F0_2 = 1200.0; // Frecuencia a suprimir en Hz
+    double Q_2 = 10.0;    // Factor de calidad del filtro
 
-    hFPB[0] = (1 / PI * 0.00001) * (sin(wc * 0.00001));
-    hFSBW[0] = 2 * hFPB[0];
-    fprintf(file, "%f\n", hFSBW[0]);
+    // Coeficientes del filtro 2
+    IIRCoefficients coeffs_2;
+    calculateNotchCoefficients(Fs, F0_2, Q_2, &coeffs_2);
 
-    for (int n = 1; n < N; n++) {
-        hFPB[n] = sin(wc * n) / (PI * n);
-        hFSBW[n] = 2 * cos(n * w0) * hFPB[n]; // NO CAUSAL
+    // Calcular la respuesta en frecuencia de los filtros
+    const int numPoints = 1000;
+    double frequency[numPoints];
+    double magnitude_1[numPoints];
+    double magnitude_2[numPoints];
+
+    for (int i = 0; i < numPoints; i++) {
+        double f = Fs * i / numPoints;
+        double omega = 2.0 * PI * f / Fs;
+        double complex z = cos(omega) + I * sin(omega);
+
+        double complex H_1 = (coeffs_1.b[0] + coeffs_1.b[1] * z + coeffs_1.b[2] * z * z) /
+                             (coeffs_1.a[0] + coeffs_1.a[1] * z + coeffs_1.a[2] * z * z);
+        double complex H_2 = (coeffs_2.b[0] + coeffs_2.b[1] * z + coeffs_2.b[2] * z * z) /
+                             (coeffs_2.a[0] + coeffs_2.a[1] * z + coeffs_2.a[2] * z * z);
+
+        frequency[i] = f;
+        magnitude_1[i] = cabs(H_1);
+        magnitude_2[i] = cabs(H_2);
     }
 
-    // Generamos ventana de Hanning
-    for (int i = 0; i < N; i++) {
-        hann[i] = 0.5 * (1 - cos(2 * PI * i / N));
+    // Guardar los datos en un archivo
+    FILE* file = fopen("response.dat", "w");
+    for (int i = 0; i < numPoints; i++) {
+        fprintf(file, "%f %f %f\n", frequency[i], magnitude_1[i], magnitude_2[i]);
     }
-
-    // Multiplicamos hFSBW por la ventana y guardamos los resultados en el archivo filtro.dat
-    for (int i = 0; i < N; i++) {
-        hFSBW[i] = hann[i] * hFSBW[i];
-        fprintf(file, "%6.4f\n", hFSBW[i]);
-    }
-
     fclose(file);
 
-    // Calcular el espectro de hFSBW utilizando el algoritmo de Goertzel
-    double espectro[N / 2];
-    Goertzel(hFSBW, N, espectro, N / 2);
-
-    // Guardar el espectro en el archivo espec.dat
-    for (int i = 0; i < N / 2; i++) {
-        fprintf(especFile, "%f\n", -espectro[i]);
-    }
-
-    fclose(especFile);
+    // Generar el gráfico utilizando Gnuplot
     system("gnuplot -p test.gp");
+
 
     return 0;
 }
