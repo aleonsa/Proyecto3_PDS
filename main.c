@@ -20,8 +20,8 @@ void convolucion(float *x, int len_x, float *h, int len_h, float *y) {
     }
 }
 
-void Goertzel(float *x, int len_x, double *y, int klim){
-	double vk0,vk1,vk2,AI, AR;
+void Goertzel(float *x, int len_x, float *y, int klim){
+	float vk0,vk1,vk2,AI, AR;
 	int k,n;
 	for(k=0; k<klim; k++){
 		vk0=0;
@@ -184,6 +184,17 @@ int main()
         fprintf(fvf, "%f\n", 100*vf[i]);
     }
 
+    float v_spec[M], vt_spec[M], vf_spec[M];
+
+    Goertzel(v, M, v_spec, M);
+    Goertzel(vt, M, vt_spec, M);
+    Goertzel(vf, M, vf_spec, M);
+
+    for (int i = 0; i < M; i++) {
+        fprintf(fv_spec, "%f\n", v_spec[i]);
+        fprintf(fvt_spec, "%f\n", vt_spec[i]);
+        fprintf(fvf_spec, "%f\n", vf_spec[i]);   
+    }
 
     /***************************************************************************************/
     // Close the file pointers

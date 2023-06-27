@@ -8,7 +8,6 @@
 #define N           298
 
 
-
 void Goertzel(float *x, int len_x, double *y, int klim) {
     double vk0, vk1, vk2, AI, AR;
     int k, n;
